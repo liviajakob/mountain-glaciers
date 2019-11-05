@@ -112,8 +112,6 @@ class PointDataSet:
 
         regression_results = {}
 
-
-
         regression_results['regression.rsquared'] = results.rsquared
         regression_results['regression.c'] = results.params.x1
         regression_results['regression.c.se'] = results.bse.x1
@@ -122,6 +120,17 @@ class PointDataSet:
         regression_results['regression.const'] = results.params.const
         regression_results['regression.const.se'] = results.bse.const
         regression_results['regression.count'] = results.nobs
+
+        regression_results['regression.const.pvalue'] = results.pvalues.const
+        regression_results['regression.c.pvalue'] = results.pvalues.x1
+        regression_results['regression.const.tvalue'] = results.tvalues.const
+        regression_results['regression.c.tvalue'] = results.tvalues.x1
+
+        intervals = results.conf_int(alpha=0.05, cols=None)
+        regression_results['regression.c.conf_interval.low'] = intervals[intervals.index=='x1'].values[0][0]*31536000
+        regression_results['regression.c.conf_interval.high'] = intervals[intervals.index=='x1'][1].values[0]*31536000
+        regression_results['regression.const.conf_interval.low'] = intervals[intervals.index=='const'][0].values[0]
+        regression_results['regression.const.conf_interval.high'] = intervals[intervals.index=='const'][1].values[0]
 
         if hasattr(self, 'regression_results'):
             merge = {**self.regression_results, **regression_results}
@@ -132,30 +141,64 @@ class PointDataSet:
         return regression_results
 
 
-    def weightedRegression(self, column='power'):
-        self.logger.info("Linear regression...")
+    def weightedRegression(self, weight='ones', mask=None):
+        '''
+
+        :param weight:
+        :param mask: If true all values with
+        :return:
+        '''
+        self.logger.info("Weighted regression...")
         # model variables
         vals = np.asarray([self.data.time])
         vals = np.transpose(vals)
         vals = sm.add_constant(vals)
         elev = self.data.refDifference
 
+        if weight =='ones':
+            self.logger.info("Weighted regression with ones as weights...")
+            weights = np.ones(self.data.shape[0])
+        else:
+            self.logger.info("Weighted regression with {} as weights...".format(weight))
+            # weights according to script
+            w = self.data[weight]*self.data[weight]
+            w = w/max(w)
+            weights = w*w
+
+        if isinstance(mask, int):
+            self.logger.info("Mask out points with > {} x Standard deviation...".format(mask))
+            mask = abs(elev-np.median(elev))>(mask*np.std(elev))
+            weights = np.where(mask,0,w)
+        print(weights)
+
+
         # Create model and fit it (least squares)
-        model = sm.OLS(elev, vals)
-        # OR robust model -- note that it won't have r squared
-        #model = sm.RLM(y, x)
+        model = sm.WLS(elev, vals, weights)
+
         results = model.fit()
 
         regression_results = {}
 
-        regression_results['regression.rsquared'] = results.rsquared
-        regression_results['regression.c'] = results.params.x1
-        regression_results['regression.c.se'] = results.bse.x1
-        regression_results['regression.c.year'] = results.params.x1*31536000
-        regression_results['regression.c.se.year'] = results.bse.x1*31536000
-        regression_results['regression.const'] = results.params.const
-        regression_results['regression.const.se'] = results.bse.const
-        regression_results['regression.count'] = results.nobs
+        regression_results['regression.w_{}.rsquared'.format(weight)] = results.rsquared
+        regression_results['regression.w_{}.c'.format(weight)] = results.params.x1
+        regression_results['regression.w_{}.c.se'.format(weight)] = results.bse.x1
+        regression_results['regression.w_{}.c.year'.format(weight)] = results.params.x1*31536000
+        regression_results['regression.w_{}.c.se.year'.format(weight)] = results.bse.x1*31536000
+        regression_results['regression.w_{}.const'.format(weight)] = results.params.const
+        regression_results['regression.w_{}.const.se'.format(weight)] = results.bse.const
+        regression_results['regression.w_{}.count'.format(weight)] = np.count_nonzero(abs(weights))
+        regression_results['regression.w_{}.count_masked'.format(weight)] = results.nobs-np.count_nonzero(abs(weights))
+        
+        regression_results['regression.const.pvalue'] = results.pvalues.const
+        regression_results['regression.c.pvalue'] = results.pvalues.x1
+        regression_results['regression.const.tvalue'] = results.tvalues.const
+        regression_results['regression.c.tvalue'] = results.tvalues.x1
+
+        intervals = results.conf_int(alpha=0.05, cols=None)
+        regression_results['regression.c.conf_interval.low'] = intervals[intervals.index=='x1'].values[0][0]*31536000
+        regression_results['regression.c.conf_interval.high'] = intervals[intervals.index=='x1'][1].values[0]*31536000
+        regression_results['regression.const.conf_interval.low'] = intervals[intervals.index=='const'][0].values[0]
+        regression_results['regression.const.conf_interval.high'] = intervals[intervals.index=='const'][1].values[0]
 
         if hasattr(self, 'regression_results'):
             merge = {**self.regression_results, **regression_results}
@@ -228,6 +271,17 @@ class PointDataSet:
         regression_results['regression.robust.const'] = results.params.const
         regression_results['regression.robust.const.se'] = results.bse.const
         regression_results['regression.robust.count'] = results.nobs
+
+        regression_results['regression.const.pvalue'] = results.pvalues.const
+        regression_results['regression.c.pvalue'] = results.pvalues.x1
+        regression_results['regression.const.tvalue'] = results.tvalues.const
+        regression_results['regression.c.tvalue'] = results.tvalues.x1
+
+        intervals = results.conf_int(alpha=0.05, cols=None)
+        regression_results['regression.c.conf_interval.low'] = intervals[intervals.index=='x1'].values[0][0]*31536000
+        regression_results['regression.c.conf_interval.high'] = intervals[intervals.index=='x1'][1].values[0]*31536000
+        regression_results['regression.const.conf_interval.low'] = intervals[intervals.index=='const'][0].values[0]
+        regression_results['regression.const.conf_interval.high'] = intervals[intervals.index=='const'][1].values[0]
 
         if hasattr(self, 'regression_results'):
             merge = {**self.regression_results, **regression_results}
@@ -513,10 +567,10 @@ if __name__ ==  '__main__':
 
 
     raster = RasterDataSet(referenceDem)
-    raster.cutToBbx(0,1000,0,1000)
-    values = raster.getValuesAt([100,200], [1000,700])
+    raster.cutToBbx(516400,517400,26600,27400)
+    #values = raster.getValuesAt([100,200], [1000,700])
     #values = raster.getValueAt(100, 700)
-    print(values)
+    #print(values)
 
     #ds = PointDataSet(fp, projection)
 

@@ -28,22 +28,37 @@ from pandas.io.json import json_normalize
 class RegressionRun:
 
 
+    # __conf = {
+    #     "outputFileName": "himalayas-from-raster.gpkg",
+    #     "inputDataSet": "ReadyHim2",
+    #     #"inputDataSet": "tdx2",
+    #     "runName": "RunHim2",
+    #     "region":"himalayas",
+    #     "parentDsName": "mtngla",
+    #     "outputPath": "regression_results",
+    #     "malardEnvironmentName": "DEVv2",
+    #     "malardSyncURL": "http://localhost:9000",
+    #     "malardAsyncURL": "ws://localhost:9000",
+    #    "filters" : [{'column':'power','op':'gt','threshold':10000},{'column':'coh','op':'gt','threshold':0.6}, \
+    #                 {'column':'demDiff','op':'lt','threshold':100}, {'column':'demDiffMad','op':'lt','threshold':10}, \
+    #                 {'column':'demDiff','op':'gt','threshold':-100}, {'column':'demDiffMad','op':'gt','threshold':-10}, \
+    #                 {'column':'refDifference','op':'gt','threshold':-150}, {'column':'refDifference','op':'lt','threshold':150}]
+    # }
+
     __conf = {
-        "outputFileName": "himalayas-from-raster.gpkg",
-        "inputDataSet": "ReadyHim2",
-        #"inputDataSet": "tdx2",
-        "runName": "RunHim2",
-        "region":"himalayas",
+        "outputFileName": "iceland.gpkg",
+        "inputDataSet": "tdx",
+        "runName": "RunIce",
+        "region":"iceland",
         "parentDsName": "mtngla",
         "outputPath": "regression_results",
         "malardEnvironmentName": "DEVv2",
         "malardSyncURL": "http://localhost:9000",
         "malardAsyncURL": "ws://localhost:9000",
-       "filters" : [{'column':'power','op':'gt','threshold':10000},{'column':'coh','op':'gt','threshold':0.6}, \
-                    {'column':'demDiff','op':'lt','threshold':100}, {'column':'demDiffMad','op':'lt','threshold':10}, \
-                    {'column':'demDiff','op':'gt','threshold':-100}, {'column':'demDiffMad','op':'gt','threshold':-10}, \
+        "filters" : [{'column':'power','op':'gt','threshold':10000},{'column':'coh','op':'gt','threshold':0.8}, \
+                     {'column':'demDiff','op':'lt','threshold':100}, {'column':'demDiffMad','op':'lt','threshold':10}, \
+                     {'column':'demDiff','op':'gt','threshold':-100}, {'column':'demDiffMad','op':'gt','threshold':-10}]
     }
-
 
 
     def __init__(self, logFile=None, notebook=False):
@@ -78,7 +93,7 @@ class RegressionRun:
 
 
 
-    def gridcellRegression(self, boundingBox, linear=True, robust=True):
+    def gridcellRegression(self, boundingBox, linear=True, robust=True, weighted=None, minCount=20):
         filters = self.config('filters')
         self.logger.info("Filtering dataset=%s with criteria %s" % (self.inputDataSet, filters))
 
@@ -89,20 +104,24 @@ class RegressionRun:
         # release cache of file
         self.client.releaseCacheHandle(result.resultFileName)
         results = {}
-        if data.data.shape[0]>2:
+        if data.data.shape[0]>minCount:
             if linear:
                 r = data.linearRegression()
                 results = {**results, **r}
             if robust:
                 r=data.robustRegression()
                 results = {**results, **r}
+            if weighted is not None:
+                for w in weighted:
+                    r= data.weightedRegression(weight=w['weight'], mask=w['mask_std_dev'])
+                    results = {**results, **r}
             self.logger.info(results)
 
         return results
 
 
 
-    def regressionFromStats(self, linear=True, robust=True, minT=None, maxT=None, minCount=50, save=True):
+    def regressionFromStats(self, linear=True, robust=True, weighted=None, minT=None, maxT=None, minCount=50, save=True):
         self.logger.info("Get run statistics for parentDS=%s runName=%s ..." % (self.inputDataSet.parentDataSet, self.runName))
         stats = self.query_sync.getRunStatistics(self.inputDataSet.parentDataSet, self.runName)
         stats = json.loads(stats)
@@ -121,7 +140,7 @@ class RegressionRun:
 
                 bbx_in = BoundingBox(minX, maxX, minY, maxY, minT, maxT)
 
-                results = self.gridcellRegression(bbx_in, linear=linear, robust=robust)
+                results = self.gridcellRegression(bbx_in, linear=linear, robust=robust, weighted=weighted)
                 self.logger.info("Adding regression results to stats...")
                 for key in results:
                     if isinstance(results[key], list):
@@ -146,7 +165,7 @@ class RegressionRun:
         return dfStats
 
 
-    def regressionFromList(self, gridcells, linear=True, robust=True, minT=None, maxT=None, save=True):
+    def regressionFromList(self, gridcells, linear=True, robust=True, weighted=None, minT=None, maxT=None, save=True):
 
         dfStats = pd.DataFrame(gridcells)
 
@@ -156,15 +175,12 @@ class RegressionRun:
             maxT = bbx.maxT
 
         for idx, line in dfStats.iterrows():
-            #if line['statistics.afterGlacierMask'] > minCount:
-            #minX,maxX=line['minX'],line['gridCell.minX']+line['gridCell.size']
-            #minY,maxY=line['gridCell.minY'],line['gridCell.minY']+line['gridCell.size']
 
             self.logger.info("Calculating gridcell minX=%s minY=%s ..." % (line['minX'], line['minY']))
 
             bbx_in = BoundingBox(line['minX'], line['maxX'], line['minY'], line['maxY'], minT, maxT)
 
-            results = self.gridcellRegression(bbx_in, linear=linear, robust=robust)
+            results = self.gridcellRegression(bbx_in, linear=linear, robust=robust, weighted=weighted)
             self.logger.info("Adding regression results to stats...")
             for key in results:
                 if isinstance(results[key], list):
@@ -189,7 +205,7 @@ class RegressionRun:
         return dfStats
 
 
-    def regressionFromRaster(self, file, linear=True, robust=True, minT=None, maxT=None, save=True):
+    def regressionFromRaster(self, file, linear=True, robust=True, weighted=None, minT=None, maxT=None, save=True):
         ''' Calcualtes regression from cells corresponding to the cells of a given input raster
 
         :param file: rasterfile path
@@ -205,9 +221,7 @@ class RegressionRun:
         raster = RasterDataSet(file)
         extents = raster.getCellsAsExtent()
 
-
-
-        stats = self.regressionFromList(extents, linear=linear, robust=robust, minT=minT, maxT=maxT, save=save)
+        stats = self.regressionFromList(extents, linear=linear, robust=robust, weighted=weighted, minT=minT, maxT=maxT, save=save)
 
         return stats
 
@@ -250,6 +264,8 @@ if __name__ ==  '__main__':
     #mtngla.startProcess()
 
     # REGRESSION FROM RASTER
-    raster = '/home/livia/IdeaProjects/malard/python/tile_0_1000_1000_0.tif'
+    #raster = '/home/livia/IdeaProjects/malard/python/tile_0_1000_1000_0.tif'
+    raster = 'tile_516400_27400_517400_26600.tif'
+
     #raster = '/home/livia/IdeaProjects/malard/python/tile_-45000_-68000_-42000_-71500.tif'
-    reg.regressionFromRaster(raster)
+    reg.regressionFromRaster(raster, robust=True, linear=True, weighted=[{'weight':'power', 'mask_std_dev':3},{'weight':'coh', 'mask_std_dev':3}])
