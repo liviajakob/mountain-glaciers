@@ -49,6 +49,19 @@ class PointDataSet:
             self.logger.info('File=%s empty. Empty dataframe is created', filename)
             self.data = pd.DataFrame()
 
+
+    def applyRadius(self, radius, centerX, centerY):
+        self.logger.info("Apply radius =%s with centerX=%s and centerY=%s" % (radius, centerX,centerY))
+        # pythagoras :)
+        distX = abs(self.data.x-centerX)
+        distY = abs(self.data.y-centerY)
+        self.data['distanceToCenter']= np.sqrt((distX*distX) + (distY*distY))
+        dfRad = self.data[self.data['distanceToCenter']<=radius]
+        print(self.data['distanceToCenter'].max())
+        print(self.data.shape, dfRad.shape)
+        self.data = dfRad
+        return self.data
+
     def asGeoDataSet(self):
         if hasattr(self, 'geoDataSet'):
             return self.geoDataSet

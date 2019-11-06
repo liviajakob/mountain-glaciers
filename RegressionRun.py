@@ -57,7 +57,7 @@ class RegressionRun:
         "malardAsyncURL": "ws://localhost:9000",
         "filters" : [{'column':'powerScaled','op':'gt','threshold':10000},{'column':'coh','op':'gt','threshold':0.8}, \
                       {'column':'demDiff','op':'lt','threshold':200}, {'column':'demDiffMad','op':'lt','threshold':40}, \
-                      {'column':'demDiff','op':'gt','threshold':-200}, {'column':'demDiffMad','op':'gt','threshold':-40}]
+                      {'column':'demDiff','op':'gt','threshold':-200}]
     }
 
 
@@ -95,7 +95,7 @@ class RegressionRun:
 
 
 
-    def gridcellRegression(self, boundingBox, linear=True, robust=True, weighted=None, minCount=20):
+    def gridcellRegression(self, boundingBox, linear=True, robust=True, weighted=None, minCount=20, radius=None):
         filters = self.config('filters')
         self.logger.info("Filtering dataset=%s with criteria %s" % (self.inputDataSet, filters))
 
@@ -104,11 +104,12 @@ class RegressionRun:
 
         self.logger.info("Result message: status=%s, message=%s" % (result.status, result.message))
         data = PointDataSet(result.resultFileName, self.projection)
-        print(data.data.shape)
-        print('coh ', data.data.coh.min(), data.data.coh.max())
-        print('power ', data.data.powerScaled.min(), data.data.powerScaled.max())
-        print('demdiff ', data.data.demDiff.min(), data.data.demDiff.max())
-        print('demdiffMad ', data.data.demDiffMad.min(), data.data.demDiffMad.max())
+
+        if radius is not None:
+            centerX=boundingBox.minX+(abs(boundingBox.maxX - boundingBox.minX)/2)
+            centerY=boundingBox.minY+(abs(boundingBox.maxY - boundingBox.minY)/2)
+            data.applyRadius(radius=radius, centerX=centerX, centerY=centerY)
+
         # release cache of file
         self.client.releaseCacheHandle(result.resultFileName)
         results = {}
@@ -189,7 +190,7 @@ class RegressionRun:
 
             bbx_in = BoundingBox(line['minX'], line['maxX'], line['minY'], line['maxY'], minT, maxT)
 
-            results = self.gridcellRegression(bbx_in, linear=linear, robust=robust, weighted=weighted)
+            results = self.gridcellRegression(bbx_in, linear=linear, robust=robust, weighted=weighted, radius=radius)
 
             self.logger.info("Adding regression results to stats...")
             for key in results:
@@ -284,7 +285,7 @@ if __name__ ==  '__main__':
     # REGRESSION FROM RASTER
     #raster = '/home/livia/IdeaProjects/malard/python/tile_0_1000_1000_0.tif'
     #raster = 'tile_516400_27400_517400_26600.tif'
-    raster = '/data/puma1/scratch/DEMs/Iceland/rate-small.tif'
+    raster = '/data/puma1/scratch/DEMs/Iceland/rate-small2.tif'
 
     #raster = '/home/livia/IdeaProjects/malard/python/tile_-45000_-68000_-42000_-71500.tif'
     #2010-12-02 07:25:15, maxT=2019-04-27
