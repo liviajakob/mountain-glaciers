@@ -1,5 +1,5 @@
 import sys
-from DataSets import *
+from DataSets2 import *
 from MalardClient.MalardClient import MalardClient
 from MalardClient.DataSet import DataSet
 from MalardClient.BoundingBox import BoundingBox
@@ -55,10 +55,12 @@ class RegressionRun:
         "malardEnvironmentName": "DEVv2",
         "malardSyncURL": "http://localhost:9000",
         "malardAsyncURL": "ws://localhost:9000",
-        "filters" : [{'column':'power','op':'gt','threshold':10000},{'column':'coh','op':'gt','threshold':0.8}, \
-                     {'column':'demDiff','op':'lt','threshold':100}, {'column':'demDiffMad','op':'lt','threshold':10}, \
-                     {'column':'demDiff','op':'gt','threshold':-100}, {'column':'demDiffMad','op':'gt','threshold':-10}]
+        "filters" : [{'column':'powerScaled','op':'gt','threshold':10000},{'column':'coh','op':'gt','threshold':0.8}, \
+                      {'column':'demDiff','op':'lt','threshold':200}, {'column':'demDiffMad','op':'lt','threshold':40}, \
+                      {'column':'demDiff','op':'gt','threshold':-200}, {'column':'demDiffMad','op':'gt','threshold':-40}]
     }
+
+
 
 
     def __init__(self, logFile=None, notebook=False):
@@ -98,9 +100,15 @@ class RegressionRun:
         self.logger.info("Filtering dataset=%s with criteria %s" % (self.inputDataSet, filters))
 
         result = self.client.executeQuery(self.inputDataSet, boundingBox, projections=[], filters=filters)
+        #result = self.client.executeQuery(self.inputDataSet, boundingBox, projections=[])
 
         self.logger.info("Result message: status=%s, message=%s" % (result.status, result.message))
         data = PointDataSet(result.resultFileName, self.projection)
+        print(data.data.shape)
+        print('coh ', data.data.coh.min(), data.data.coh.max())
+        print('power ', data.data.powerScaled.min(), data.data.powerScaled.max())
+        print('demdiff ', data.data.demDiff.min(), data.data.demDiff.max())
+        print('demdiffMad ', data.data.demDiffMad.min(), data.data.demDiffMad.max())
         # release cache of file
         self.client.releaseCacheHandle(result.resultFileName)
         results = {}
@@ -116,6 +124,7 @@ class RegressionRun:
                     r= data.weightedRegression(weight=w['weight'], mask=w['mask_std_dev'])
                     results = {**results, **r}
             self.logger.info(results)
+
 
         return results
 
@@ -136,7 +145,7 @@ class RegressionRun:
                 minX,maxX=line['gridCell.minX'],line['gridCell.minX']+line['gridCell.size']
                 minY,maxY=line['gridCell.minY'],line['gridCell.minY']+line['gridCell.size']
 
-                self.logger.info("Calculating gridcell minX=%s minY=%s ..." % (minX, minY))
+                self.logger.info("Calculating gridcell minX=%s maxX=%s minY=%s maxY=%s minT=%s maxT=%s ..." % (minX, maxX, minY, maxY, minT, maxT))
 
                 bbx_in = BoundingBox(minX, maxX, minY, maxY, minT, maxT)
 
@@ -165,7 +174,7 @@ class RegressionRun:
         return dfStats
 
 
-    def regressionFromList(self, gridcells, linear=True, robust=True, weighted=None, minT=None, maxT=None, save=True):
+    def regressionFromList(self, gridcells, linear=True, robust=True, weighted=None, minT=None, maxT=None, save=True, radius=None):
 
         dfStats = pd.DataFrame(gridcells)
 
@@ -176,11 +185,12 @@ class RegressionRun:
 
         for idx, line in dfStats.iterrows():
 
-            self.logger.info("Calculating gridcell minX=%s minY=%s ..." % (line['minX'], line['minY']))
+            self.logger.info("Calculating gridcell minX=%s maxX=%s minY=%s maxY=%s minT=%s maxT=%s ..." % (line['minX'],line['maxX'], line['minY'], line['maxY'], minT, maxT))
 
             bbx_in = BoundingBox(line['minX'], line['maxX'], line['minY'], line['maxY'], minT, maxT)
 
             results = self.gridcellRegression(bbx_in, linear=linear, robust=robust, weighted=weighted)
+
             self.logger.info("Adding regression results to stats...")
             for key in results:
                 if isinstance(results[key], list):
@@ -205,10 +215,11 @@ class RegressionRun:
         return dfStats
 
 
-    def regressionFromRaster(self, file, linear=True, robust=True, weighted=None, minT=None, maxT=None, save=True):
+    def regressionFromRaster(self, file, linear=True, robust=True, weighted=None, minT=None, maxT=None, save=True, rasterNoData=-1000000, radius=None):
         ''' Calcualtes regression from cells corresponding to the cells of a given input raster
 
         :param file: rasterfile path
+        :param radius: if None the exact extent of the raster cell is used, else the center of the rastercell and the points within a given rasius is used
         :return:
         '''
         self.logger.info("Start regression from raster for parentDS=%s runName=%s ..." % (self.inputDataSet.parentDataSet, self.runName))
@@ -217,11 +228,18 @@ class RegressionRun:
             minT = bbx.minT
             maxT = bbx.maxT
 
-
         raster = RasterDataSet(file)
-        extents = raster.getCellsAsExtent()
 
-        stats = self.regressionFromList(extents, linear=linear, robust=robust, weighted=weighted, minT=minT, maxT=maxT, save=save)
+        if radius is None:
+            extents = raster.getCellsAsExtent()
+        else:
+            xy, values = raster.getCenterPoints()
+            extents=[]
+            for i,el in enumerate(xy):
+                if values[i] != rasterNoData:
+                    extents.append({'minX':el[0]-radius, 'maxX': el[0]+radius, 'minY':el[1]-radius, 'maxY':el[1]+radius})
+
+        stats = self.regressionFromList(extents, linear=linear, robust=robust, weighted=weighted, minT=minT, maxT=maxT, save=save, radius=radius)
 
         return stats
 
@@ -265,7 +283,10 @@ if __name__ ==  '__main__':
 
     # REGRESSION FROM RASTER
     #raster = '/home/livia/IdeaProjects/malard/python/tile_0_1000_1000_0.tif'
-    raster = 'tile_516400_27400_517400_26600.tif'
+    #raster = 'tile_516400_27400_517400_26600.tif'
+    raster = '/data/puma1/scratch/DEMs/Iceland/rate-small.tif'
 
     #raster = '/home/livia/IdeaProjects/malard/python/tile_-45000_-68000_-42000_-71500.tif'
-    reg.regressionFromRaster(raster, robust=True, linear=True, weighted=[{'weight':'power', 'mask_std_dev':3},{'weight':'coh', 'mask_std_dev':3}])
+    #2010-12-02 07:25:15, maxT=2019-04-27
+    reg.regressionFromRaster(raster, robust=True, linear=True,radius=500, weighted=[{'weight':'powerScaled', 'mask_std_dev':3},{'weight':'coh', 'mask_std_dev':3}])
+
