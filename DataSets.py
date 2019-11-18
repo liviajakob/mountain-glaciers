@@ -221,7 +221,27 @@ class PointDataSet:
         return regression_results
 
 
-    def timeSeries(self, startdate=datetime.datetime(2010,11,1,0,0), enddate=datetime.datetime(2019,1,1,0,0), interval=3):
+    def _addWeights(self, weight='ones', mask=3):
+        elev = self.data.refDifference
+        if weight =='ones':
+            self.logger.info("Weighted regression with ones as weights...")
+            weights = np.ones(self.data.shape[0])
+        else:
+            self.logger.info("Weighted regression with {} as weights...".format(weight))
+            # weights according to script
+            w = self.data[weight]*self.data[weight]
+            w = w/max(w)
+            weights = w*w
+        if isinstance(mask, int):
+            self.logger.info("Mask out points with elevation > {} x Standard deviation...".format(mask))
+            mask = abs(elev-np.median(elev))>(mask*np.std(elev))
+            weights = np.where(mask,0,w)
+        self.data['w_{}'.format(weight)]=weights
+        self.data['w_{}_refDiff'.format(weight)]=self.data['w_{}'.format(weight)]*self.data.refDifference
+        return weights
+
+
+    def timeSeries(self, startdate=datetime.datetime(2010,11,1,0,0), enddate=datetime.datetime(2019,1,1,0,0), interval=3, weighted=[]):
         self.logger.info("Calculating time series...")
 
         dateobjects = []
@@ -235,12 +255,23 @@ class PointDataSet:
         dates = []
         changes = []
         medians = []
+        weighted_res = {}
+
+        for w in weighted:
+            self.logger.info("Weighted time series with {} ...".format(w))
+            self._addWeights(weight=w['weight'], mask=w['mask_std_dev'])
+            weighted_res[w['weight']]=[]
 
         use_date = startdate
         while use_date <= enddate:
             df_filt = self.data[(self.data.dateobject >= use_date) & (self.data.dateobject <(use_date+relativedelta(months=+interval)))]
             averages.append(df_filt.refDifference.mean())
             medians.append(df_filt.refDifference.median())
+
+            for we in weighted:
+                mean=df_filt['w_{}_refDiff'.format(we['weight'])].mean()
+                weighted_res[we['weight']].append(mean)
+
             dates.append(use_date)
             use_date = use_date+relativedelta(months=+interval)
 
@@ -253,6 +284,10 @@ class PointDataSet:
         timeseries_results['timeseries.averages'] = averages
         timeseries_results['timeseries.medians'] = medians
         timeseries_results['timeseries.change'] = changes
+
+        for we in weighted:
+
+            timeseries_results['timeseries.{}'.format(we['weight'])] = weighted_res[we['weight']]
 
         if hasattr(self, 'timeseries_results'):
             merge = {**self.timeseries_results, **timeseries_results}
