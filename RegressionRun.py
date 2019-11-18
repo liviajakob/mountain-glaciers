@@ -1,5 +1,5 @@
 import sys
-from DataSets2 import *
+from DataSets import *
 from MalardClient.MalardClient import MalardClient
 from MalardClient.DataSet import DataSet
 from MalardClient.BoundingBox import BoundingBox
@@ -28,37 +28,37 @@ from pandas.io.json import json_normalize
 class RegressionRun:
 
 
-    # __conf = {
-    #     "outputFileName": "himalayas-from-raster.gpkg",
-    #     "inputDataSet": "ReadyHim2",
-    #     #"inputDataSet": "tdx2",
-    #     "runName": "RunHim2",
-    #     "region":"himalayas",
-    #     "parentDsName": "mtngla",
-    #     "outputPath": "regression_results",
-    #     "malardEnvironmentName": "DEVv2",
-    #     "malardSyncURL": "http://localhost:9000",
-    #     "malardAsyncURL": "ws://localhost:9000",
-    #    "filters" : [{'column':'power','op':'gt','threshold':10000},{'column':'coh','op':'gt','threshold':0.6}, \
-    #                 {'column':'demDiff','op':'lt','threshold':100}, {'column':'demDiffMad','op':'lt','threshold':10}, \
-    #                 {'column':'demDiff','op':'gt','threshold':-100}, {'column':'demDiffMad','op':'gt','threshold':-10}, \
-    #                 {'column':'refDifference','op':'gt','threshold':-150}, {'column':'refDifference','op':'lt','threshold':150}]
-    # }
-
     __conf = {
-        "outputFileName": "iceland5.gpkg",
-        "inputDataSet": "tdx",
-        "runName": "RunIce",
-        "region":"iceland",
+        "outputFileName": "himalayas-weighted.gpkg",
+        "inputDataSet": "ReadyHim2",
+        #"inputDataSet": "tdx2",
+        "runName": "RunHim2",
+        "region":"himalayas",
         "parentDsName": "mtngla",
         "outputPath": "regression_results",
         "malardEnvironmentName": "DEVv2",
         "malardSyncURL": "http://localhost:9000",
         "malardAsyncURL": "ws://localhost:9000",
-        "filters" : [{'column':'powerScaled','op':'gt','threshold':10000},{'column':'coh','op':'gt','threshold':0.8}, \
-                      {'column':'demDiff','op':'lt','threshold':200}, {'column':'demDiffMad','op':'lt','threshold':40}, \
-                      ]
+       "filters" : [{'column':'power','op':'gt','threshold':10000},{'column':'coh','op':'gt','threshold':0.6}, \
+                    {'column':'demDiff','op':'lt','threshold':100}, {'column':'demDiffMad','op':'lt','threshold':10}, \
+                    {'column':'demDiff','op':'gt','threshold':-100}, {'column':'demDiffMad','op':'gt','threshold':-10}, \
+                    {'column':'refDifference','op':'gt','threshold':-150}, {'column':'refDifference','op':'lt','threshold':150}]
     }
+
+    # __conf = {
+    #     "outputFileName": "iceland5.gpkg",
+    #     "inputDataSet": "tdx",
+    #     "runName": "RunIce",
+    #     "region":"iceland",
+    #     "parentDsName": "mtngla",
+    #     "outputPath": "regression_results",
+    #     "malardEnvironmentName": "DEVv2",
+    #     "malardSyncURL": "http://localhost:9000",
+    #     "malardAsyncURL": "ws://localhost:9000",
+    #     "filters" : [{'column':'powerScaled','op':'gt','threshold':10000},{'column':'coh','op':'gt','threshold':0.8}, \
+    #                   {'column':'demDiff','op':'lt','threshold':200}, {'column':'demDiffMad','op':'lt','threshold':40}, \
+    #                   ]
+    # }
 
 
 
@@ -287,7 +287,7 @@ if __name__ ==  '__main__':
 
     # RUN ALL
     #reg = RegressionRun()
-    #reg.regressionFromStats()
+    reg.regressionFromStats(robust=True, linear=True, weighted=[{'weight':'power', 'mask_std_dev':3},{'weight':'coh', 'mask_std_dev':3}])
 
 
     #mtngla.startProcess()
@@ -299,5 +299,5 @@ if __name__ ==  '__main__':
 
     #raster = '/home/livia/IdeaProjects/malard/python/tile_-45000_-68000_-42000_-71500.tif'
     #2010-12-02 07:25:15, maxT=2019-04-27
-    reg.regressionFromRaster(raster, robust=True, linear=True, radius=500, weighted=[{'weight':'powerScaled', 'mask_std_dev':3},{'weight':'coh', 'mask_std_dev':3}])
+    #reg.regressionFromRaster(raster, robust=True, linear=True, radius=500, weighted=[{'weight':'powerScaled', 'mask_std_dev':3},{'weight':'coh', 'mask_std_dev':3}])
 
