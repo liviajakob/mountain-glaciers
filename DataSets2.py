@@ -137,7 +137,7 @@ class PointDataSet:
         regression_results['regression.const.tvalue'] = results.tvalues.const
         regression_results['regression.c.tvalue'] = results.tvalues.x1
 
-        intervals = results.conf_int(alpha=0.05, cols=None)
+        intervals = results.conf_int(alpha=0.32, cols=None)
         regression_results['regression.c.conf_interval.low'] = intervals[intervals.index=='x1'].values[0][0]*31536000
         regression_results['regression.c.conf_interval.high'] = intervals[intervals.index=='x1'][1].values[0]*31536000
         regression_results['regression.const.conf_interval.low'] = intervals[intervals.index=='const'][0].values[0]
@@ -177,7 +177,7 @@ class PointDataSet:
             weights = w*w
 
         if isinstance(mask, int):
-            self.logger.info("Mask out points with > {} x Standard deviation...".format(mask))
+            self.logger.info("Mask out points with elevation > {} x Standard deviation...".format(mask))
             mask = abs(elev-np.median(elev))>(mask*np.std(elev))
             weights = np.where(mask,0,w)
 
@@ -199,16 +199,16 @@ class PointDataSet:
         regression_results['regression.w_{}.count'.format(weight)] = np.count_nonzero(abs(weights))
         regression_results['regression.w_{}.count_masked'.format(weight)] = results.nobs-np.count_nonzero(abs(weights))
 
-        regression_results['regression.w_{}.const.pvalue'] = results.pvalues.const
-        regression_results['regression.w_{}.c.pvalue'] = results.pvalues.x1
-        regression_results['regression.w_{}.const.tvalue'] = results.tvalues.const
-        regression_results['regression.c.tvalue'] = results.tvalues.x1
+        regression_results['regression.w_{}.const.pvalue'.format(weight)] = results.pvalues.const
+        regression_results['regression.w_{}.c.pvalue'.format(weight)] = results.pvalues.x1
+        regression_results['regression.w_{}.const.tvalue'.format(weight)] = results.tvalues.const
+        regression_results['regression.c.tvalue'.format(weight)] = results.tvalues.x1
 
-        intervals = results.conf_int(alpha=0.05, cols=None)
-        regression_results['regression.w_{}.c.conf_interval.low'] = intervals[intervals.index=='x1'].values[0][0]*31536000
-        regression_results['regression.w_{}.c.conf_interval.high'] = intervals[intervals.index=='x1'][1].values[0]*31536000
-        regression_results['regression.w_{}.const.conf_interval.low'] = intervals[intervals.index=='const'][0].values[0]
-        regression_results['regression.w_{}.const.conf_interval.high'] = intervals[intervals.index=='const'][1].values[0]
+        intervals = results.conf_int(alpha=0.32, cols=None)
+        regression_results['regression.w_{}.c.conf_interval.low'.format(weight)] = intervals[intervals.index=='x1'].values[0][0]*31536000
+        regression_results['regression.w_{}.c.conf_interval.high'.format(weight)] = intervals[intervals.index=='x1'][1].values[0]*31536000
+        regression_results['regression.w_{}.const.conf_interval.low'.format(weight)] = intervals[intervals.index=='const'][0].values[0]
+        regression_results['regression.w_{}.const.conf_interval.high'.format(weight)] = intervals[intervals.index=='const'][1].values[0]
 
         if hasattr(self, 'regression_results'):
             merge = {**self.regression_results, **regression_results}
@@ -289,7 +289,7 @@ class PointDataSet:
         regression_results['regression.robust.const.tvalue'] = results.tvalues.const
         regression_results['regression.robust.c.tvalue'] = results.tvalues.x1
 
-        intervals = results.conf_int(alpha=0.05, cols=None)
+        intervals = results.conf_int(alpha=0.32, cols=None)
         regression_results['regression.robust.c.conf_interval.low'] = intervals[intervals.index=='x1'].values[0][0]*31536000
         regression_results['regression.robust.c.conf_interval.high'] = intervals[intervals.index=='x1'][1].values[0]*31536000
         regression_results['regression.robust.const.conf_interval.low'] = intervals[intervals.index=='const'][0].values[0]

@@ -46,7 +46,7 @@ class RegressionRun:
     # }
 
     __conf = {
-        "outputFileName": "iceland.gpkg",
+        "outputFileName": "iceland5.gpkg",
         "inputDataSet": "tdx",
         "runName": "RunIce",
         "region":"iceland",
@@ -57,7 +57,7 @@ class RegressionRun:
         "malardAsyncURL": "ws://localhost:9000",
         "filters" : [{'column':'powerScaled','op':'gt','threshold':10000},{'column':'coh','op':'gt','threshold':0.8}, \
                       {'column':'demDiff','op':'lt','threshold':200}, {'column':'demDiffMad','op':'lt','threshold':40}, \
-                      {'column':'demDiff','op':'gt','threshold':-200}]
+                      ]
     }
 
 
@@ -95,8 +95,9 @@ class RegressionRun:
 
 
 
-    def gridcellRegression(self, boundingBox, linear=True, robust=True, weighted=None, minCount=20, radius=None):
-        filters = self.config('filters')
+    def gridcellRegression(self, boundingBox, linear=True, robust=True, weighted=None, minCount=10, radius=None, filters=None):
+        if filters is None:
+            filters = self.config('filters')
         self.logger.info("Filtering dataset=%s with criteria %s" % (self.inputDataSet, filters))
 
         result = self.client.executeQuery(self.inputDataSet, boundingBox, projections=[], filters=filters)
@@ -108,7 +109,10 @@ class RegressionRun:
         if radius is not None:
             centerX=boundingBox.minX+(abs(boundingBox.maxX - boundingBox.minX)/2)
             centerY=boundingBox.minY+(abs(boundingBox.maxY - boundingBox.minY)/2)
+            self.logger.info("Apply radius with centerX=%s and centerY=%s..." % (centerX, centerY))
+            self.logger.info("Before radius count=%s..." % (data.data.shape[0]))
             data.applyRadius(radius=radius, centerX=centerX, centerY=centerY)
+            self.logger.info("After radius count=%s..." % (data.data.shape[0]))
 
         # release cache of file
         self.client.releaseCacheHandle(result.resultFileName)
@@ -125,7 +129,8 @@ class RegressionRun:
                     r= data.weightedRegression(weight=w['weight'], mask=w['mask_std_dev'])
                     results = {**results, **r}
             self.logger.info(results)
-
+        else:
+            self.logger.info("Not enough data in cell (%s points)" % (data.data.shape[0]))
 
         return results
 
@@ -237,8 +242,13 @@ class RegressionRun:
             xy, values = raster.getCenterPoints()
             extents=[]
             for i,el in enumerate(xy):
+                self.logger.info("Calculating gridcell %s / %s ..." % (i+1, len(values)))
                 if values[i] != rasterNoData:
-                    extents.append({'minX':el[0]-radius, 'maxX': el[0]+radius, 'minY':el[1]-radius, 'maxY':el[1]+radius})
+                    ext = {'minX':el[0]-radius, 'maxX': el[0]+radius, 'minY':el[1]-radius, 'maxY':el[1]+radius}
+                    extents.append(ext)
+                    self.logger.info("Extent with radius=%s is minX=%s maxX=%s minY=%s maxY=%s ..." % (radius, ext['minX'], ext['maxX'], ext['minY'], ext['maxY']))
+                else:
+                    self.logger.info("Raster cell=%s has no data no (datavalue=%s) and is skipped  ..." % (el, rasterNoData))
 
         stats = self.regressionFromList(extents, linear=linear, robust=robust, weighted=weighted, minT=minT, maxT=maxT, save=save, radius=radius)
 
@@ -285,9 +295,9 @@ if __name__ ==  '__main__':
     # REGRESSION FROM RASTER
     #raster = '/home/livia/IdeaProjects/malard/python/tile_0_1000_1000_0.tif'
     #raster = 'tile_516400_27400_517400_26600.tif'
-    raster = '/data/puma1/scratch/DEMs/Iceland/rate-small2.tif'
+    raster = '/data/puma1/scratch/DEMs/Iceland/proj4/rate-small4.tif'
 
     #raster = '/home/livia/IdeaProjects/malard/python/tile_-45000_-68000_-42000_-71500.tif'
     #2010-12-02 07:25:15, maxT=2019-04-27
-    reg.regressionFromRaster(raster, robust=True, linear=True,radius=500, weighted=[{'weight':'powerScaled', 'mask_std_dev':3},{'weight':'coh', 'mask_std_dev':3}])
+    reg.regressionFromRaster(raster, robust=True, linear=True, radius=500, weighted=[{'weight':'powerScaled', 'mask_std_dev':3},{'weight':'coh', 'mask_std_dev':3}])
 
