@@ -16,6 +16,7 @@ from pandas.io.json import json_normalize
 #"inputDataSet": "ReadyDataAlaska2",
 #"runName": "AlaskaRun2",
 #"region":"alaska",
+#{'column':'within_DataSet','op':'gt','threshold':1}
 
 # HMA
 #"outputFileName": "himalayas.json",
@@ -26,7 +27,7 @@ from pandas.io.json import json_normalize
 class TimeseriesRun:
 
     __conf = {
-        "outputFileName": "himalayas-weighted-tdx.json",
+        "outputFileName": "himalayas-weighted.json",
         "inputDataSet": "ReadyHim2",
         "runName": "RunHim2",
         "region":"himalayas",
@@ -38,12 +39,11 @@ class TimeseriesRun:
         "filters" : [{'column':'power','op':'gt','threshold':10000},{'column':'coh','op':'gt','threshold':0.6}, \
                      {'column':'demDiff','op':'lt','threshold':100}, {'column':'demDiffMad','op':'lt','threshold':10}, \
                      {'column':'demDiff','op':'gt','threshold':-100}, {'column':'demDiffMad','op':'gt','threshold':-10}, \
-                     {'column':'refDifference','op':'gt','threshold':-150}, {'column':'refDifference','op':'lt','threshold':150}, \
-                     {'column':'within_DataSet','op':'gt','threshold':1}]
+                     {'column':'refDifference','op':'gt','threshold':-150}, {'column':'refDifference','op':'lt','threshold':150}]
     }
 
     # __conf = {
-    #     "outputFileName": "alaska-weighted-tdx.json",
+    #     "outputFileName": "alaska-weighted.json",
     #     "runName": "AlaskaRun2",
     #     "inputDataSet": "ReadyDataAlaska2",
     #     "region":"alaska",
@@ -55,8 +55,7 @@ class TimeseriesRun:
     #     "filters" : [{'column':'power','op':'gt','threshold':10000},{'column':'coh','op':'gt','threshold':0.6}, \
     #                  {'column':'demDiff','op':'lt','threshold':100}, {'column':'demDiffMad','op':'lt','threshold':10}, \
     #                  {'column':'demDiff','op':'gt','threshold':-100}, {'column':'demDiffMad','op':'gt','threshold':-10}, \
-    #                  {'column':'refDifference','op':'gt','threshold':-150}, {'column':'refDifference','op':'lt','threshold':150}, \
-    #                  {'column':'within_DataSet','op':'gt','threshold':1}]
+    #                  {'column':'refDifference','op':'gt','threshold':-150}, {'column':'refDifference','op':'lt','threshold':150}]
     # }
 
 
