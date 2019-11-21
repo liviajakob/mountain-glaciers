@@ -27,7 +27,7 @@ from pandas.io.json import json_normalize
 class TimeseriesRun:
 
     __conf = {
-        "outputFileName": "himalayas-weighted.json",
+        "outputFileName": "himalayas-weighted-tdx.json",
         "inputDataSet": "ReadyHim2",
         "runName": "RunHim2",
         "region":"himalayas",
@@ -39,7 +39,8 @@ class TimeseriesRun:
         "filters" : [{'column':'power','op':'gt','threshold':10000},{'column':'coh','op':'gt','threshold':0.6}, \
                      {'column':'demDiff','op':'lt','threshold':100}, {'column':'demDiffMad','op':'lt','threshold':10}, \
                      {'column':'demDiff','op':'gt','threshold':-100}, {'column':'demDiffMad','op':'gt','threshold':-10}, \
-                     {'column':'refDifference','op':'gt','threshold':-150}, {'column':'refDifference','op':'lt','threshold':150}]
+                     {'column':'refDifference','op':'gt','threshold':-150}, {'column':'refDifference','op':'lt','threshold':150}, \
+                     {'column':'within_DataSet','op':'gt','threshold':1}]
     }
 
     # __conf = {
@@ -191,11 +192,11 @@ if __name__ ==  '__main__':
     minY = 0
     maxY = 100000
 
-    #bbx_in = BoundingBox(minX, maxX, minY, maxY, minT, maxT)
-    #results = reg.gridcellTimeseries(bbx_in, startdate=datetime.datetime(2010,11,1,0,0), enddate=datetime.datetime(2019,1,1,0,0), interval=3, weighted=[{'weight':'power', 'mask_std_dev':3},{'weight':'coh', 'mask_std_dev':3}])
+    bbx_in = BoundingBox(minX, maxX, minY, maxY, minT, maxT)
+    results = reg.gridcellTimeseries(bbx_in, startdate=datetime.datetime(2010,11,1,0,0), enddate=datetime.datetime(2019,1,1,0,0), interval=3, weighted=[{'weight':'power', 'mask_std_dev':3},{'weight':'coh', 'mask_std_dev':3}])
 
 
     #sprint(results)
 
     # RUN ALL
-    reg.timeseriesFromStats(startdate=datetime.datetime(2010,11,1,0,0), enddate=datetime.datetime(2019,1,1,0,0), interval=3, weighted=[{'weight':'power', 'mask_std_dev':3},{'weight':'coh', 'mask_std_dev':3}])
+    #reg.timeseriesFromStats(startdate=datetime.datetime(2010,11,1,0,0), enddate=datetime.datetime(2019,1,1,0,0), interval=3, weighted=[{'weight':'power', 'mask_std_dev':3},{'weight':'coh', 'mask_std_dev':3}])

@@ -32,7 +32,7 @@ class PointDataSet:
     def __init__(self, data, projection, stats={}):
         '''
         :param data: can be a dataframe or a filename to a netcdf
-        :param projection:
+        :param projection: proj4
         '''
         self.logger = logging.getLogger(__name__)
         self.projection = projection
@@ -221,24 +221,21 @@ class PointDataSet:
         return regression_results
 
 
-    def _addWeights(self, weight='ones', mask=3):
-        elev = self.data.refDifference
+    def _addWeights(self,subset, weight='ones', mask=3):
+        elev = subset.refDifference
         if weight =='ones':
-            self.logger.info("Weighted regression with ones as weights...")
-            weights = np.ones(self.data.shape[0])
+            weights = np.ones(subset.shape[0])
         else:
-            self.logger.info("Weighted regression with {} as weights...".format(weight))
             # weights according to script
-            w = self.data[weight]*self.data[weight]
+            w = subset[weight]*subset[weight]
             w = w/max(w)
             weights = w*w
         if isinstance(mask, int):
-            self.logger.info("Mask out points with elevation > {} x Standard deviation...".format(mask))
             mask = abs(elev-np.median(elev))>(mask*np.std(elev))
             weights = np.where(mask,0,w)
-        self.data['w_{}'.format(weight)]=weights
-        self.data['w_{}_refDiff'.format(weight)]=self.data['w_{}'.format(weight)]*self.data.refDifference
-        return weights
+        subset['w_{}'.format(weight)]=weights
+        subset['w_{}_refDiff'.format(weight)]=subset['w_{}'.format(weight)]*subset.refDifference
+        return subset
 
 
     def timeSeries(self, startdate=datetime.datetime(2010,11,1,0,0), enddate=datetime.datetime(2019,1,1,0,0), interval=3, weighted=[]):
@@ -259,9 +256,7 @@ class PointDataSet:
 
         for w in weighted:
             self.logger.info("Weighted time series with {} ...".format(w))
-            self._addWeights(weight=w['weight'], mask=w['mask_std_dev'])
             weighted_res[w['weight']]=[]
-
         use_date = startdate
         while use_date <= enddate:
             df_filt = self.data[(self.data.dateobject >= use_date) & (self.data.dateobject <(use_date+relativedelta(months=+interval)))]
@@ -269,7 +264,11 @@ class PointDataSet:
             medians.append(df_filt.refDifference.median())
 
             for we in weighted:
-                mean=df_filt['w_{}_refDiff'.format(we['weight'])].mean()
+                if df_filt.shape[0]>0:
+                    df_filt = self._addWeights(df_filt.copy(), weight=we['weight'], mask=we['mask_std_dev'])
+                    mean = df_filt['w_{}_refDiff'.format(we['weight'])].mean()
+                else: # when no data for this month
+                    mean=float('nan')
                 weighted_res[we['weight']].append(mean)
 
             dates.append(use_date)
