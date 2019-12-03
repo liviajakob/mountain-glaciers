@@ -194,8 +194,8 @@ class PointDataSet:
         regression_results['regression.w_{}.rsquared'.format(weight)] = results.rsquared
         regression_results['regression.w_{}.c'.format(weight)] = results.params.x1
         regression_results['regression.w_{}.c.se'.format(weight)] = results.bse.x1
-        regression_results['regression.w_{}.c.year'.format(weight)] = results.params.x1*31536000
-        regression_results['regression.w_{}.c.se.year'.format(weight)] = results.bse.x1*31536000
+        regression_results['regression.w_{}.c.year'.format(weight)] = results.params.x1*31556926.08
+        regression_results['regression.w_{}.c.se.year'.format(weight)] = results.bse.x1*31556926.08
         regression_results['regression.w_{}.const'.format(weight)] = results.params.const
         regression_results['regression.w_{}.const.se'.format(weight)] = results.bse.const
         regression_results['regression.w_{}.count'.format(weight)] = np.count_nonzero(abs(weights))
@@ -207,8 +207,8 @@ class PointDataSet:
         regression_results['regression.c.tvalue'.format(weight)] = results.tvalues.x1
 
         intervals = results.conf_int(alpha=0.05, cols=None)
-        regression_results['regression.w_{}.c.conf_interval.low'.format(weight)] = intervals[intervals.index=='x1'].values[0][0]*31536000
-        regression_results['regression.w_{}.c.conf_interval.high'.format(weight)] = intervals[intervals.index=='x1'][1].values[0]*31536000
+        regression_results['regression.w_{}.c.conf_interval.low'.format(weight)] = intervals[intervals.index=='x1'].values[0][0]*31556926.08
+        regression_results['regression.w_{}.c.conf_interval.high'.format(weight)] = intervals[intervals.index=='x1'][1].values[0]*31556926.08
         regression_results['regression.w_{}.const.conf_interval.low'.format(weight)] = intervals[intervals.index=='const'][0].values[0]
         regression_results['regression.w_{}.const.conf_interval.high'.format(weight)] = intervals[intervals.index=='const'][1].values[0]
 
@@ -218,6 +218,53 @@ class PointDataSet:
         else:
             self.regression_results = regression_results
 
+        self._noelsRegression(weights=weights, weightDescription=weight)
+
+        return regression_results
+
+    def _noelsRegression(self, weights, weightDescription):
+        '''Calculates error and rate according to Noels algorithm
+
+        :param weights: list of weights between 0 and 1
+        :param weightDescription: attribute of weights for regression result description, a string. e.g. "power"
+        :return:
+        '''
+        self.logger.info("Weighted regression with Noels Algorithm...")
+        sqw = np.sqrt(weights)
+        # transpose of elevation
+        # compute the inverse of the model matrix
+        self.logger.info("Weighted regression with Noels Algorithm: G_inv...")
+        trans=np.transpose(np.multiply(sqw,[self.data.time,list(np.ones(self.data.time.size))]))
+        pinv = np.linalg.pinv(trans)
+        G_inv=[pinv[0]*sqw,pinv[1]*sqw]
+        # compute the model coefficients
+        self.logger.info("Weighted regression with Noels Algorithm: coeff...")
+        indep=np.mat([self.data.time,list(np.ones(self.data.time.size))]).T
+        dep=np.mat(self.data.refDifference).T
+        coeff = G_inv*dep
+        self.logger.info("Weighted regression with Noels Algorithm: dep_modelled...")
+        d_modelled = indep*coeff
+        d_diff = dep-d_modelled
+        d_diff_pow = np.square(d_diff)
+        d_diff_pow_array=np.squeeze(np.asarray(d_diff_pow))
+        self.logger.info("Weighted regression with Noels Algorithm: Cov matrix...")
+        G_var = [G_inv[0]*d_diff_pow_array,G_inv[1]*d_diff_pow_array]
+        cov_matrix = np.mat(G_var)*np.mat(G_inv).T
+        self.logger.info("Weighted regression with Noels Algorithm: Error and rate...")
+        error=np.sqrt(np.diag(cov_matrix)[0])*31556926.08
+        rate=coeff[0,0]*31556926.08
+        regression_results = {}
+
+        regression_results['regression.noel.w_{}.rate'.format(weightDescription)] = rate
+        regression_results['regression.noel.w_{}.error'.format(weightDescription)] = error
+
+        if hasattr(self, 'regression_results'):
+            merge = {**self.regression_results, **regression_results}
+            self.regression_results = merge
+        else:
+            self.regression_results = regression_results
+
+        self.logger.info("Finished weighted regression with Noels Algorithm.")
         return regression_results
 
 

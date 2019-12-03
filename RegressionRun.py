@@ -31,8 +31,8 @@ class RegressionRun:
 
 
     __conf = {
-        "outputFileName": "himalayas-weighted-tdx.gpkg",
-        "inputDataSet": "ReadyHim2",
+        "outputFileName": "himalayas-mad-tdx.gpkg",
+        "inputDataSet": "HimMad2",
         #"inputDataSet": "tdx2",
         "runName": "RunHim2",
         "region":"himalayas",
@@ -42,8 +42,8 @@ class RegressionRun:
         "malardSyncURL": "http://localhost:9000",
         "malardAsyncURL": "ws://localhost:9000",
        "filters" : [{'column':'power','op':'gt','threshold':10000},{'column':'coh','op':'gt','threshold':0.6}, \
-                    {'column':'demDiff','op':'lt','threshold':100}, {'column':'demDiffMad','op':'lt','threshold':10}, \
-                    {'column':'demDiff','op':'gt','threshold':-100}, {'column':'demDiffMad','op':'gt','threshold':-10}, \
+                    {'column':'demDiff','op':'lt','threshold':100}, {'column':'demDiffMadNew','op':'lt','threshold':10}, \
+                    {'column':'demDiff','op':'gt','threshold':-100}, \
                     {'column':'refDifference','op':'gt','threshold':-150}, {'column':'refDifference','op':'lt','threshold':150}, \
                     {'column':'within_DataSet','op':'gt','threshold':1}]
     }
