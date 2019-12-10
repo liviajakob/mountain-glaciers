@@ -24,6 +24,11 @@ class MtnGlaGridcellProcess:
     #"withinDataSetTypes": ["Debris", "DataSet"],
     #"referenceDem": "/data/puma1/scratch/mtngla/dems/HMA_TDX_Masked_SRTM_Merged_coreg_aea_clip.tif",
     #"inputDataSet": "tdx2",
+    #
+    # "runName": "HimMad2",
+    # "outputDataSet": "HimMad2",
+    # "parentDsName": "mtngla",
+    # "region":"himalayas",
 
 
     # ALASKA
@@ -37,15 +42,16 @@ class MtnGlaGridcellProcess:
     #"referenceDem": "/data/puma1/scratch/mtngla/dems/PCR_TdxFilledWithAD_Masked_Polar_Interp_clip.tif",
     #"inputDataSet": "ADwithTDX",
 
+
     __conf = {
-        "runName": "HimMad2",
-        "outputDataSet": "HimMad2",
+        "runName": "AlaskaMad",
+        "outputDataSet": "AlaskaMad",
         "parentDsName": "mtngla",
-        "region":"himalayas",
+        "region":"alaska",
         "maskDataSet": "RGIv60",
-        "withinDataSets": ["SDCv10", "/data/puma1/scratch/mtngla/dems/Tdx_SRTM_SurfaceSplit.tiff"],
+        "withinDataSets": ["SDCv10", "/data/puma1/scratch/mtngla/dems/TD_AD_Interp_SurfaceSplit.tiff"],
         "withinDataSetTypes": ["Debris", "DataSet"],
-        "referenceDem": "/data/puma1/scratch/mtngla/dems/HMA_TDX_Masked_SRTM_Merged_coreg_aea_clip.tif",
+        "referenceDem": "/data/puma1/scratch/mtngla/dems/PCR_TdxFilledWithAD_Masked_Polar_Interp_clip.tif",
         "inputDataSet": "tdx_mad",
         "malardEnvironmentName": "DEVv2",
         "malardSyncURL": "http://localhost:9000",
@@ -242,7 +248,7 @@ class MtnGlaGridcellProcess:
         self.logger.error("Uncaught exception", exc_info=(type, value, tb))
 
 if __name__ ==  '__main__':
-    mtngla = MtnGlaGridcellProcess(400000, 500000, 0, 100000)
+    #mtngla = MtnGlaGridcellProcess(400000, 500000, 0, 100000)
     #mtngla = MtnGlaGridcellProcess(500000, 600000, 0, 100000)
     #mtngla = MtnGlaGridcellProcess(700000, 800000, 0, 100000)
     #mtngla = MtnGlaGridcellProcess(500000, 600000, 100000, 200000)
@@ -255,7 +261,7 @@ if __name__ ==  '__main__':
     #mtngla = MtnGlaGridcellProcess(-200000, -100000, -200000, -100000)
 
     # alaska
-    #mtngla = MtnGlaGridcellProcess(-3900000, -3800000, -500000, -400000)
+    mtngla = MtnGlaGridcellProcess(-3900000, -3800000, -500000, -400000)
 
     # alaska out of bounds error
     #mtngla = MtnGlaGridcellProcess(-3300000, -3200000, 600000, 700000)

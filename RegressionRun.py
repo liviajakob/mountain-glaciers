@@ -30,41 +30,39 @@ from pandas.io.json import json_normalize
 class RegressionRun:
 
 
-    __conf = {
-        "outputFileName": "himalayas-mad-tdx.gpkg",
-        "inputDataSet": "HimMad2",
-        #"inputDataSet": "tdx2",
-        "runName": "RunHim2",
-        "region":"himalayas",
-        "parentDsName": "mtngla",
-        "outputPath": "regression_results",
-        "malardEnvironmentName": "DEVv2",
-        "malardSyncURL": "http://localhost:9000",
-        "malardAsyncURL": "ws://localhost:9000",
-       "filters" : [{'column':'power','op':'gt','threshold':10000},{'column':'coh','op':'gt','threshold':0.6}, \
-                    {'column':'demDiff','op':'lt','threshold':100}, {'column':'demDiffMadNew','op':'lt','threshold':10}, \
-                    {'column':'demDiff','op':'gt','threshold':-100}, \
-                    {'column':'refDifference','op':'gt','threshold':-150}, {'column':'refDifference','op':'lt','threshold':150}, \
-                    {'column':'within_DataSet','op':'gt','threshold':1}]
-    }
-
     # __conf = {
-    #     "outputFileName": "alaska-weighted-tdx.gpkg",
-    #     "inputDataSet": "ReadyDataAlaska2",
-    #     #"inputDataSet": "tdx2",
-    #     "runName": "AlaskaRun2",
-    #     "region":"alaska",
+    #     "outputFileName": "himalayas-gridcells.gpkg",
+    #     "inputDataSet": "HimMad2",
+    #     "runName": "HimMad2",
+    #     "region":"himalayas",
     #     "parentDsName": "mtngla",
     #     "outputPath": "regression_results",
     #     "malardEnvironmentName": "DEVv2",
     #     "malardSyncURL": "http://localhost:9000",
     #     "malardAsyncURL": "ws://localhost:9000",
-    #     "filters" : [{'column':'power','op':'gt','threshold':10000},{'column':'coh','op':'gt','threshold':0.6}, \
-    #                  {'column':'demDiff','op':'lt','threshold':100}, {'column':'demDiffMad','op':'lt','threshold':10}, \
-    #                  {'column':'demDiff','op':'gt','threshold':-100}, {'column':'demDiffMad','op':'gt','threshold':-10}, \
-    #                  {'column':'refDifference','op':'gt','threshold':-150}, {'column':'refDifference','op':'lt','threshold':150}, \
-    #                  {'column':'within_DataSet','op':'gt','threshold':1}]
+    #    "filters" : [{'column':'power','op':'gt','threshold':10000},{'column':'coh','op':'gt','threshold':0.6}, \
+    #                 {'column':'demDiff','op':'lt','threshold':100}, {'column':'demDiffMadNew','op':'lt','threshold':10}, \
+    #                 {'column':'demDiff','op':'gt','threshold':-100}, \
+    #                 {'column':'refDifference','op':'gt','threshold':-150}, {'column':'refDifference','op':'lt','threshold':150}, \
+    #                 {'column':'within_DataSet','op':'gt','threshold':1}]
     # }
+
+    __conf = {
+        "outputFileName": "alaska-gridcells-double.gpkg",
+        "inputDataSet": "AlaskaMad",
+        "runName": "AlaskaMad",
+        "region":"alaska",
+        "parentDsName": "mtngla",
+        "outputPath": "regression_results",
+        "malardEnvironmentName": "DEVv2",
+        "malardSyncURL": "http://localhost:9000",
+        "malardAsyncURL": "ws://localhost:9000",
+        "filters" : [{'column':'power','op':'gt','threshold':10000},{'column':'coh','op':'gt','threshold':0.6}, \
+                     {'column':'demDiff','op':'lt','threshold':100}, {'column':'demDiffMadNew','op':'lt','threshold':10}, \
+                     {'column':'demDiff','op':'gt','threshold':-100}, \
+                     {'column':'refDifference','op':'gt','threshold':-150}, {'column':'refDifference','op':'lt','threshold':150}, \
+                     {'column':'within_DataSet','op':'gt','threshold':1}]
+    }
 
 
     # __conf = {
@@ -78,7 +76,7 @@ class RegressionRun:
     #     "malardSyncURL": "http://localhost:9000",
     #     "malardAsyncURL": "ws://localhost:9000",
     #     "filters" : [{'column':'powerScaled','op':'gt','threshold':10000},{'column':'coh','op':'gt','threshold':0.8}, \
-    #                   {'column':'demDiff','op':'lt','threshold':200}, {'column':'demDiffMad','op':'lt','threshold':40}, \
+    #                   {'column':'demDiff','op':'lt','threshold':200}, {'column':'demDiffMadNew','op':'lt','threshold':40}, \
     #                   ]
     # }
 
@@ -127,6 +125,7 @@ class RegressionRun:
 
         self.logger.info("Result message: status=%s, message=%s" % (result.status, result.message))
         data = PointDataSet(result.resultFileName, self.projection)
+        self.logger.info("Dataset has %s points" % (data.data.shape[0]))
 
         if radius is not None:
             centerX=boundingBox.minX+(abs(boundingBox.maxX - boundingBox.minX)/2)
@@ -139,7 +138,7 @@ class RegressionRun:
         # release cache of file
         self.client.releaseCacheHandle(result.resultFileName)
         results = {}
-        if data.data.shape[0]>minCount:
+        if data.data.shape[0]>minCount and not data.data['time'].nunique()==1:
             if linear:
                 r = data.linearRegression()
                 results = {**results, **r}
@@ -202,7 +201,7 @@ class RegressionRun:
         return dfStats
 
 
-    def regressionFromList(self, gridcells, linear=True, robust=True, weighted=None, minT=None, maxT=None, save=True, radius=None):
+    def regressionFromList(self, gridcells, linear=True, robust=True, weighted=None, minT=None, maxT=None, save=True, radius=None, geometry='point'):
 
         dfStats = pd.DataFrame(gridcells)
 
@@ -214,8 +213,7 @@ class RegressionRun:
         for idx, line in dfStats.iterrows():
 
             self.logger.info("Calculating gridcell minX=%s maxX=%s minY=%s maxY=%s minT=%s maxT=%s ..." % (line['minX'],line['maxX'], line['minY'], line['maxY'], minT, maxT))
-
-            bbx_in = BoundingBox(line['minX'], line['maxX'], line['minY'], line['maxY'], minT, maxT)
+            bbx_in = BoundingBox(line['minX'].item(), line['maxX'].item(), line['minY'].item(), line['maxY'].item(), minT, maxT)
 
             results = self.gridcellRegression(bbx_in, linear=linear, robust=robust, weighted=weighted, radius=radius)
 
@@ -231,8 +229,19 @@ class RegressionRun:
                 else:
                     dfStats.at[idx, key] = results[key]
 
-        size = dfStats['maxX']- dfStats['minX']
-        geometry = [Point(xy) for xy in zip(dfStats['minX']+(size/2), dfStats['minY']+(size/2))]
+        size = dfStats['maxX']-dfStats['minX']
+        if geometry=='point:':
+            self.logger.info("Converted to point geometry")
+            geometry = [Point(xy) for xy in zip(dfStats['minX']+(size/2), dfStats['minY']+(size/2))]
+        elif geometry == 'cell':
+            self.logger.info("Converted to cell geometry")
+            geometry = []
+            for idx, line in dfStats.iterrows():
+                minX,maxX=line['minX'],line['maxX']
+                minY,maxY=line['minY'],line['maxY']
+                geometry.append(Polygon([(minX,minY), (minX,maxY), (maxX,maxY), (maxX,minY), (minX,minY)]))
+        else:
+            self.logger.info("Error: not valid geometry specified. Should be either 'point' or 'cell'")
         dfStats = gp.GeoDataFrame(dfStats, crs=self.projection, geometry=geometry)
 
         if save:
@@ -243,7 +252,7 @@ class RegressionRun:
         return dfStats
 
 
-    def regressionFromRaster(self, file, linear=True, robust=True, weighted=None, minT=None, maxT=None, save=True, rasterNoData=-1000000, radius=None):
+    def regressionFromRaster(self, file, linear=True, robust=True, weighted=None, minT=None, maxT=None, save=True, rasterNoData=-1000000, radius=None, geometry='point'):
         ''' Calcualtes regression from cells corresponding to the cells of a given input raster
 
         :param file: rasterfile path
@@ -272,9 +281,35 @@ class RegressionRun:
                 else:
                     self.logger.info("Raster cell=%s has no data no (datavalue=%s) and is skipped  ..." % (el, rasterNoData))
 
-        stats = self.regressionFromList(extents, linear=linear, robust=robust, weighted=weighted, minT=minT, maxT=maxT, save=save, radius=radius)
+        stats = self.regressionFromList(extents, linear=linear, robust=robust, weighted=weighted, minT=minT, maxT=maxT, save=save, radius=radius, geometry=geometry)
 
         return stats
+
+
+    def regressionFromFile(self, file, linear=True, robust=True, weighted=None, minT=None, maxT=None, save=True, radius=None, geometry='point'):
+        ''' Calcualtes regression from cells corresponding to the cells of a given input raster
+
+        :param file: rasterfile path
+        :param radius: if None the exact extent of the raster cell is used, else the center of the rastercell and the points within a given rasius is used
+        :return:
+        '''
+
+        self.logger.info("Start regression from file for parentDS=%s ..." % (self.inputDataSet.parentDataSet))
+        if minT is None and maxT is None:
+            bbx = self.client.boundingBox(self.inputDataSet)
+            minT = bbx.minT
+            maxT = bbx.maxT
+
+        extents =[]
+        with open(file) as f:
+            for line in f:
+                split = line.strip().split(",")
+                ext = {'minX':int(split[0]), 'maxX': int(split[1]), 'minY':int(split[2]), 'maxY':int(split[3])}
+                extents.append(ext)
+        stats = self.regressionFromList(extents, linear=linear, robust=robust, weighted=weighted, minT=minT, maxT=maxT, save=save, radius=radius, geometry=geometry)
+
+        return stats
+
 
 
     @staticmethod
@@ -291,25 +326,30 @@ if __name__ ==  '__main__':
     #(500000, 600000, 100000, 200000)
     #(500000, 600000, -100000, 0)
 
-    reg = RegressionRun()
-    # minT and maxT
-    #bbx = reg.client.boundingBox(reg.inputDataSet)
-    #minT = bbx.minT
-    #maxT = bbx.maxT
-    # minX etc.
-    #minX = 400000
-    #maxX = 500000
-    #minY = 0
-    #maxY = 100000
+    # reg = RegressionRun()
+    # #minT and maxT
+    # bbx = reg.client.boundingBox(reg.inputDataSet)
+    # minT = bbx.minT
+    # maxT = bbx.maxT
+    # # minX etc.
+    # minX = 400000
+    # maxX = 500000
+    # minY = 0
+    # maxY = 100000
+    # # minX = -1200000
+    # # maxX = -1100000
+    # # minY = 600000
+    # # maxY = 700000
+    #
+    # bbx_in = BoundingBox(minX, maxX, minY, maxY, minT, maxT)
+    # #
+    # results = reg.gridcellRegression(bbx_in, robust=True, linear=True, weighted=[{'weight':'power', 'mask_std_dev':3},{'weight':'coh', 'mask_std_dev':3},{'weight':'powercoh', 'mask_std_dev':3}])
+    # print(results)
 
-    #bbx_in = BoundingBox(minX, maxX, minY, maxY, minT, maxT)
-
-    #results = reg.gridcellRegression(bbx_in)
-    #print(results)
 
     # RUN ALL
     #reg = RegressionRun()
-    reg.regressionFromStats(robust=True, linear=True, weighted=[{'weight':'power', 'mask_std_dev':3},{'weight':'coh', 'mask_std_dev':3}])
+    #reg.regressionFromStats(robust=True, linear=True, weighted=[{'weight':'power', 'mask_std_dev':3},{'weight':'coh', 'mask_std_dev':3},{'weight':'powercoh', 'mask_std_dev':3}])
 
 
     #mtngla.startProcess()
@@ -317,9 +357,13 @@ if __name__ ==  '__main__':
     # REGRESSION FROM RASTER
     #raster = '/home/livia/IdeaProjects/malard/python/tile_0_1000_1000_0.tif'
     #raster = 'tile_516400_27400_517400_26600.tif'
-    raster = '/data/puma1/scratch/DEMs/Iceland/proj4/rate-small4.tif'
+    #raster = '/data/puma1/scratch/DEMs/Iceland/proj4/rate-small4.tif'
 
     #raster = '/home/livia/IdeaProjects/malard/python/tile_-45000_-68000_-42000_-71500.tif'
     #2010-12-02 07:25:15, maxT=2019-04-27
     #reg.regressionFromRaster(raster, robust=True, linear=True, radius=500, weighted=[{'weight':'powerScaled', 'mask_std_dev':3},{'weight':'coh', 'mask_std_dev':3}])
 
+    # RUN FROM FILE
+    file = 'alaska-gridcells-double.txt'
+    reg = RegressionRun()
+    reg.regressionFromFile(file=file, robust=True, linear=True, weighted=[{'weight':'power', 'mask_std_dev':3},{'weight':'coh', 'mask_std_dev':3},{'weight':'powercoh', 'mask_std_dev':3}], geometry='cell')

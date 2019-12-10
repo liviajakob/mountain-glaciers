@@ -125,25 +125,28 @@ class PointDataSet:
 
         regression_results = {}
 
-        regression_results['regression.rsquared'] = results.rsquared
+        #regression_results['regression.rsquared'] = results.rsquared
         regression_results['regression.c'] = results.params.x1
         regression_results['regression.c.se'] = results.bse.x1
-        regression_results['regression.c.year'] = results.params.x1*31536000
-        regression_results['regression.c.se.year'] = results.bse.x1*31536000
+        regression_results['regression.c.year'] = results.params.x1*31556926.08
+        regression_results['regression.c.se.year'] = results.bse.x1*31556926.08
         regression_results['regression.const'] = results.params.const
-        regression_results['regression.const.se'] = results.bse.const
+        #regression_results['regression.const.se'] = results.bse.const
         regression_results['regression.count'] = results.nobs
 
-        regression_results['regression.const.pvalue'] = results.pvalues.const
-        regression_results['regression.c.pvalue'] = results.pvalues.x1
-        regression_results['regression.const.tvalue'] = results.tvalues.const
-        regression_results['regression.c.tvalue'] = results.tvalues.x1
+        regression_results['regression.linear.time_unique']=self.data['time'].nunique()
+        regression_results['regression.linear.time_span']=(self.data['time'].max()-self.data['time'].min())/60/60/24 #time span in days
 
-        intervals = results.conf_int(alpha=0.05, cols=None)
-        regression_results['regression.c.conf_interval.low'] = intervals[intervals.index=='x1'].values[0][0]*31536000
-        regression_results['regression.c.conf_interval.high'] = intervals[intervals.index=='x1'][1].values[0]*31536000
-        regression_results['regression.const.conf_interval.low'] = intervals[intervals.index=='const'][0].values[0]
-        regression_results['regression.const.conf_interval.high'] = intervals[intervals.index=='const'][1].values[0]
+        #regression_results['regression.const.pvalue'] = results.pvalues.const
+        #regression_results['regression.c.pvalue'] = results.pvalues.x1
+        #regression_results['regression.const.tvalue'] = results.tvalues.const
+        #regression_results['regression.c.tvalue'] = results.tvalues.x1
+
+        #intervals = results.conf_int(alpha=0.05, cols=None)
+        #regression_results['regression.c.conf_interval.low'] = intervals[intervals.index=='x1'].values[0][0]*31536000
+        #regression_results['regression.c.conf_interval.high'] = intervals[intervals.index=='x1'][1].values[0]*31536000
+        #regression_results['regression.const.conf_interval.low'] = intervals[intervals.index=='const'][0].values[0]
+        #regression_results['regression.const.conf_interval.high'] = intervals[intervals.index=='const'][1].values[0]
 
         if hasattr(self, 'regression_results'):
             merge = {**self.regression_results, **regression_results}
@@ -171,6 +174,14 @@ class PointDataSet:
         if weight =='ones':
             self.logger.info("Weighted regression with ones as weights...")
             weights = np.ones(self.data.shape[0])
+        elif weight=='powercoh':
+            w1 = self.data['power']*self.data['power']
+            w1 = w1/max(w1)
+            weights1 = w1*w1
+            w2 = self.data['coh']*self.data['coh']
+            w2 = w2/max(w2)
+            weights2 = w2*w2
+            weights = (weights1+weights2)/2
         else:
             self.logger.info("Weighted regression with {} as weights...".format(weight))
             # weights according to script
@@ -181,7 +192,7 @@ class PointDataSet:
         if isinstance(mask, int):
             self.logger.info("Mask out points with elevation > {} x Standard deviation...".format(mask))
             mask = abs(elev-np.median(elev))>(mask*np.std(elev))
-            weights = np.where(mask,0,w)
+            weights = np.where(mask,0,weights)
 
 
         # Create model and fit it (least squares)
@@ -191,7 +202,7 @@ class PointDataSet:
 
         regression_results = {}
 
-        regression_results['regression.w_{}.rsquared'.format(weight)] = results.rsquared
+        #regression_results['regression.w_{}.rsquared'.format(weight)] = results.rsquared
         regression_results['regression.w_{}.c'.format(weight)] = results.params.x1
         regression_results['regression.w_{}.c.se'.format(weight)] = results.bse.x1
         regression_results['regression.w_{}.c.year'.format(weight)] = results.params.x1*31556926.08
@@ -201,24 +212,32 @@ class PointDataSet:
         regression_results['regression.w_{}.count'.format(weight)] = np.count_nonzero(abs(weights))
         regression_results['regression.w_{}.count_masked'.format(weight)] = results.nobs-np.count_nonzero(abs(weights))
 
-        regression_results['regression.w_{}.const.pvalue'.format(weight)] = results.pvalues.const
-        regression_results['regression.w_{}.c.pvalue'.format(weight)] = results.pvalues.x1
-        regression_results['regression.w_{}.const.tvalue'.format(weight)] = results.tvalues.const
-        regression_results['regression.c.tvalue'.format(weight)] = results.tvalues.x1
+        # add other params
+        self.data['weights'] = weights
+        filtered = self.data[self.data['weights']>0]
+        regression_results['regression.w_{}.time_unique'.format(weight)]=filtered['time'].nunique()
+        regression_results['regression.w_{}.time_span'.format(weight)]=(filtered['time'].max()-filtered['time'].min())/60/60/24 #time span in days
 
-        intervals = results.conf_int(alpha=0.05, cols=None)
-        regression_results['regression.w_{}.c.conf_interval.low'.format(weight)] = intervals[intervals.index=='x1'].values[0][0]*31556926.08
-        regression_results['regression.w_{}.c.conf_interval.high'.format(weight)] = intervals[intervals.index=='x1'][1].values[0]*31556926.08
-        regression_results['regression.w_{}.const.conf_interval.low'.format(weight)] = intervals[intervals.index=='const'][0].values[0]
-        regression_results['regression.w_{}.const.conf_interval.high'.format(weight)] = intervals[intervals.index=='const'][1].values[0]
+
+        #regression_results['regression.w_{}.const.pvalue'.format(weight)] = results.pvalues.const
+        #regression_results['regression.w_{}.c.pvalue'.format(weight)] = results.pvalues.x1
+        #regression_results['regression.w_{}.const.tvalue'.format(weight)] = results.tvalues.const
+        #regression_results['regression.c.tvalue'.format(weight)] = results.tvalues.x1
+
+        #intervals = results.conf_int(alpha=0.05, cols=None)
+        #regression_results['regression.w_{}.c.conf_interval.low'.format(weight)] = intervals[intervals.index=='x1'].values[0][0]*31556926.08
+        #regression_results['regression.w_{}.c.conf_interval.high'.format(weight)] = intervals[intervals.index=='x1'][1].values[0]*31556926.08
+        #regression_results['regression.w_{}.const.conf_interval.low'.format(weight)] = intervals[intervals.index=='const'][0].values[0]
+        #regression_results['regression.w_{}.const.conf_interval.high'.format(weight)] = intervals[intervals.index=='const'][1].values[0]
+
+        noel_reg=self._noelsRegression(weights=weights, weightDescription=weight)
+        regression_results={**regression_results, **noel_reg}
 
         if hasattr(self, 'regression_results'):
             merge = {**self.regression_results, **regression_results}
             self.regression_results = merge
         else:
             self.regression_results = regression_results
-
-        self._noelsRegression(weights=weights, weightDescription=weight)
 
         return regression_results
 
@@ -253,17 +272,11 @@ class PointDataSet:
         self.logger.info("Weighted regression with Noels Algorithm: Error and rate...")
         error=np.sqrt(np.diag(cov_matrix)[0])*31556926.08
         rate=coeff[0,0]*31556926.08
+
         regression_results = {}
 
         regression_results['regression.noel.w_{}.rate'.format(weightDescription)] = rate
         regression_results['regression.noel.w_{}.error'.format(weightDescription)] = error
-
-        if hasattr(self, 'regression_results'):
-            merge = {**self.regression_results, **regression_results}
-            self.regression_results = merge
-        else:
-            self.regression_results = regression_results
-
         self.logger.info("Finished weighted regression with Noels Algorithm.")
         return regression_results
 
@@ -272,6 +285,14 @@ class PointDataSet:
         elev = subset.refDifference
         if weight =='ones':
             weights = np.ones(subset.shape[0])
+        elif weight == 'powercoh':
+            w1 = subset['power']*subset['power']
+            w1 = w1/max(w1)
+            weights1 = w1*w1
+            w2 = subset['coh']*subset['coh']
+            w2 = w2/max(w2)
+            weights2 = w2*w2
+            weights = (weights1+weights2)/2
         else:
             # weights according to script
             w = subset[weight]*subset[weight]
@@ -279,7 +300,7 @@ class PointDataSet:
             weights = w*w
         if isinstance(mask, int):
             mask = abs(elev-np.median(elev))>(mask*np.std(elev))
-            weights = np.where(mask,0,w)
+            weights = np.where(mask,0,weights)
         subset['w_{}'.format(weight)]=weights
         subset['w_{}_refDiff'.format(weight)]=subset['w_{}'.format(weight)]*subset.refDifference
         return subset
@@ -359,22 +380,25 @@ class PointDataSet:
 
         regression_results['regression.robust.c'] = results.params.x1
         regression_results['regression.robust.c.se'] = results.bse.x1
-        regression_results['regression.robust.c.year'] = results.params.x1*31536000
-        regression_results['regression.robust.c.se.year'] = results.bse.x1*31536000
+        regression_results['regression.robust.c.year'] = results.params.x1*31556926.08
+        regression_results['regression.robust.c.se.year'] = results.bse.x1*31556926.08
         regression_results['regression.robust.const'] = results.params.const
         regression_results['regression.robust.const.se'] = results.bse.const
         regression_results['regression.robust.count'] = results.nobs
 
-        regression_results['regression.robust.const.pvalue'] = results.pvalues.const
-        regression_results['regression.robust.c.pvalue'] = results.pvalues.x1
-        regression_results['regression.robust.const.tvalue'] = results.tvalues.const
-        regression_results['regression.robust.c.tvalue'] = results.tvalues.x1
+        #regression_results['regression.robust.const.pvalue'] = results.pvalues.const
+        #regression_results['regression.robust.c.pvalue'] = results.pvalues.x1
+        #regression_results['regression.robust.const.tvalue'] = results.tvalues.const
+        #regression_results['regression.robust.c.tvalue'] = results.tvalues.x1
 
-        intervals = results.conf_int(alpha=0.05, cols=None)
-        regression_results['regression.robust.c.conf_interval.low'] = intervals[intervals.index=='x1'].values[0][0]*31536000
-        regression_results['regression.robust.c.conf_interval.high'] = intervals[intervals.index=='x1'][1].values[0]*31536000
-        regression_results['regression.robust.const.conf_interval.low'] = intervals[intervals.index=='const'][0].values[0]
-        regression_results['regression.robust.const.conf_interval.high'] = intervals[intervals.index=='const'][1].values[0]
+        #intervals = results.conf_int(alpha=0.05, cols=None)
+        #regression_results['regression.robust.c.conf_interval.low'] = intervals[intervals.index=='x1'].values[0][0]*31536000
+        #regression_results['regression.robust.c.conf_interval.high'] = intervals[intervals.index=='x1'][1].values[0]*31536000
+        #regression_results['regression.robust.const.conf_interval.low'] = intervals[intervals.index=='const'][0].values[0]
+        #regression_results['regression.robust.const.conf_interval.high'] = intervals[intervals.index=='const'][1].values[0]
+
+        regression_results['regression.linear.time_unique']=self.data['time'].nunique()
+        regression_results['regression.linear.time_span']=(self.data['time'].max()-self.data['time'].min())/60/60/24 #time span in days
 
         if hasattr(self, 'regression_results'):
             merge = {**self.regression_results, **regression_results}

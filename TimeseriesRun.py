@@ -26,38 +26,38 @@ from pandas.io.json import json_normalize
 
 class TimeseriesRun:
 
-    __conf = {
-        "outputFileName": "himalayas-weighted-tdx.json",
-        "inputDataSet": "ReadyHim2",
-        "runName": "RunHim2",
-        "region":"himalayas",
-        "parentDsName": "mtngla",
-        "outputPath": "timeseries_results",
-        "malardEnvironmentName": "DEVv2",
-        "malardSyncURL": "http://localhost:9000",
-        "malardAsyncURL": "ws://localhost:9000",
-        "filters" : [{'column':'power','op':'gt','threshold':10000},{'column':'coh','op':'gt','threshold':0.6}, \
-                     {'column':'demDiff','op':'lt','threshold':100}, {'column':'demDiffMadNew','op':'lt','threshold':10}, \
-                     {'column':'demDiff','op':'gt','threshold':-100}, \
-                     {'column':'refDifference','op':'gt','threshold':-150}, {'column':'refDifference','op':'lt','threshold':150}, \
-                     {'column':'within_DataSet','op':'gt','threshold':1}]
-    }
-
     # __conf = {
-    #     "outputFileName": "alaska-weighted.json",
-    #     "runName": "AlaskaRun2",
-    #     "inputDataSet": "ReadyDataAlaska2",
-    #     "region":"alaska",
+    #     "outputFileName": "himalayas-mad-tdx2.json",
+    #     "inputDataSet": "HimMad2",
+    #     "runName": "HimMad2",
+    #     "region":"himalayas",
     #     "parentDsName": "mtngla",
     #     "outputPath": "timeseries_results",
     #     "malardEnvironmentName": "DEVv2",
     #     "malardSyncURL": "http://localhost:9000",
     #     "malardAsyncURL": "ws://localhost:9000",
     #     "filters" : [{'column':'power','op':'gt','threshold':10000},{'column':'coh','op':'gt','threshold':0.6}, \
-    #                  {'column':'demDiff','op':'lt','threshold':100}, {'column':'demDiffMad','op':'lt','threshold':10}, \
-    #                  {'column':'demDiff','op':'gt','threshold':-100}, {'column':'demDiffMad','op':'gt','threshold':-10}, \
-    #                  {'column':'refDifference','op':'gt','threshold':-150}, {'column':'refDifference','op':'lt','threshold':150}]
+    #                  {'column':'demDiff','op':'lt','threshold':100}, {'column':'demDiffMadNew','op':'lt','threshold':10}, \
+    #                  {'column':'demDiff','op':'gt','threshold':-100}, \
+    #                  {'column':'refDifference','op':'gt','threshold':-150}, {'column':'refDifference','op':'lt','threshold':150}, \
+    #                  {'column':'within_DataSet','op':'gt','threshold':1}]
     # }
+
+    __conf = {
+        "outputFileName": "alaska-gridcells-double.json",
+        "inputDataSet": "AlaskaMad",
+        "runName": "AlaskaMad",
+        "region":"alaska",
+        "parentDsName": "mtngla",
+        "outputPath": "timeseries_results",
+        "malardEnvironmentName": "DEVv2",
+        "malardSyncURL": "http://localhost:9000",
+        "malardAsyncURL": "ws://localhost:9000",
+        "filters" : [{'column':'power','op':'gt','threshold':10000},{'column':'coh','op':'gt','threshold':0.6}, \
+                     {'column':'demDiff','op':'lt','threshold':100}, {'column':'demDiffMad','op':'lt','threshold':10}, \
+                     {'column':'demDiff','op':'gt','threshold':-100}, {'column':'demDiffMad','op':'gt','threshold':-10}, \
+                     {'column':'refDifference','op':'gt','threshold':-150}, {'column':'refDifference','op':'lt','threshold':150}]
+    }
 
 
     def __init__(self, logFile=None):
@@ -162,6 +162,68 @@ class TimeseriesRun:
 
 
 
+    def timeseriesFromList(self, gridcells, startdate, enddate, interval=3, minT=None, maxT=None, save=True, weighted=None):
+
+        dfStats = pd.DataFrame(gridcells)
+
+        if minT is None and maxT is None:
+            bbx = self.client.boundingBox(self.inputDataSet)
+            minT = bbx.minT
+            maxT = bbx.maxT
+
+        for idx, line in dfStats.iterrows():
+
+            self.logger.info("Calculating gridcell minX=%s maxX=%s minY=%s maxY=%s minT=%s maxT=%s ..." % (line['minX'],line['maxX'], line['minY'], line['maxY'], minT, maxT))
+            bbx_in = BoundingBox(line['minX'].item(), line['maxX'].item(), line['minY'].item(), line['maxY'].item(), minT, maxT)
+
+            results = self.gridcellTimeseries(bbx_in, startdate, enddate, interval, weighted=weighted)
+
+            self.logger.info("Adding timesereis results to stats...")
+            for key in results:
+                if isinstance(results[key], list):
+                    if not np.isin(key, dfStats.columns):
+                        newColumn = [key]
+                        #
+                        dfStats = dfStats.reindex(columns=np.append( dfStats.columns.values, newColumn))
+                        dfStats[[key]]= dfStats[[key]].astype('object', inplace=True)
+                        dfStats.at[idx, key] = results[key]
+                    else:
+                        dfStats.at[idx, key] = results[key]
+
+        if save:
+            file = os.path.join(self.config("outputPath"), self.config("outputFileName"))
+            self.logger.info("Saving results under file=%s" % file)
+            dfStats.to_json(file)
+
+        return dfStats
+
+
+
+    def timeseriesFromFile(self, file, startdate, enddate, interval=3, minT=None, maxT=None, save=True, weighted=None):
+        ''' Calcualtes timeseries from cells corresponding to the cells of a given input file
+
+        :param file: textfile with gridcell extents
+        :return:
+        '''
+
+        self.logger.info("Start timeseries from file for parentDS=%s ..." % (self.inputDataSet.parentDataSet))
+        if minT is None and maxT is None:
+            bbx = self.client.boundingBox(self.inputDataSet)
+            minT = bbx.minT
+            maxT = bbx.maxT
+
+        extents =[]
+        with open(file) as f:
+            for line in f:
+                split = line.strip().split(",")
+                ext = {'minX':int(split[0]), 'maxX': int(split[1]), 'minY':int(split[2]), 'maxY':int(split[3])}
+                extents.append(ext)
+        stats = self.timeseriesFromList(extents, startdate=startdate, enddate=enddate, interval=interval, minT=minT, maxT=maxT, save=save, weighted=weighted)
+
+        return stats
+
+
+
     @staticmethod
     def config(name):
         return TimeseriesRun.__conf[name]
@@ -178,25 +240,29 @@ if __name__ ==  '__main__':
 
     reg = TimeseriesRun()
     # minT and maxT
-    bbx = reg.client.boundingBox(reg.inputDataSet)
-    minT = bbx.minT
-    maxT = bbx.maxT
+    #bbx = reg.client.boundingBox(reg.inputDataSet)
+    #minT = bbx.minT
+    #maxT = bbx.maxT
     # minX etc.
     #minX = -3900000
     #maxX = -3800000
     #minY = -600000
     #maxY = -500000
     #
-    minX = 400000
-    maxX = 500000
-    minY = 0
-    maxY = 100000
+    #minX = 400000
+    #maxX = 500000
+    #minY = 0
+    #maxY = 100000
 
-    bbx_in = BoundingBox(minX, maxX, minY, maxY, minT, maxT)
-    results = reg.gridcellTimeseries(bbx_in, startdate=datetime.datetime(2010,11,1,0,0), enddate=datetime.datetime(2019,1,1,0,0), interval=3, weighted=[{'weight':'power', 'mask_std_dev':3},{'weight':'coh', 'mask_std_dev':3}])
+    #bbx_in = BoundingBox(minX, maxX, minY, maxY, minT, maxT)
+    #results = reg.gridcellTimeseries(bbx_in, startdate=datetime.datetime(2010,11,1,0,0), enddate=datetime.datetime(2019,1,1,0,0), interval=3, weighted=[{'weight':'power', 'mask_std_dev':3},{'weight':'coh', 'mask_std_dev':3}])
 
 
     #sprint(results)
 
     # RUN ALL
-    #reg.timeseriesFromStats(startdate=datetime.datetime(2010,11,1,0,0), enddate=datetime.datetime(2019,1,1,0,0), interval=3, weighted=[{'weight':'power', 'mask_std_dev':3},{'weight':'coh', 'mask_std_dev':3}])
+    #reg.timeseriesFromStats(startdate=datetime.datetime(2010,11,1,0,0), enddate=datetime.datetime(2019,1,1,0,0), interval=3, weighted=[{'weight':'power', 'mask_std_dev':3},{'weight':'coh', 'mask_std_dev':3},{'weight':'powercoh', 'mask_std_dev':3}])
+
+    # RUN FROM LIST
+    file = 'alaska-gridcells-double.txt'
+    reg.timeseriesFromFile(file=file, startdate=datetime.datetime(2010,11,1,0,0), enddate=datetime.datetime(2019,1,1,0,0), interval=3, weighted=[{'weight':'power', 'mask_std_dev':3},{'weight':'coh', 'mask_std_dev':3},{'weight':'powercoh', 'mask_std_dev':3}])
